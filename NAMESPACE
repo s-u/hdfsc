@@ -1,0 +1,2 @@
+useDynLib(hdfsc, mk_hdfs_conn)
+export(HDFS)
