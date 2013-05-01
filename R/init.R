@@ -1,3 +1,6 @@
+volatiles <- new.env(parent=emptyenv())
+attr(volatiles, "name") <- "volatiles:hdfsc"
+
 .init <- function() {
   hadoop <- getOption("hadoop.cmd")
   if (is.null(hadoop)) hadoop <- "hadoop"
@@ -11,12 +14,7 @@
 
 .onLoad <- function(lib, pkg) {
   .jpackage(pkg, lib.loc = lib)
-
-  .imports <- parent.env(topenv())
-  .i.par <- parent.env(.imports)
-  volatiles <- new.env(parent=.i.par)
-  attr(volatiles, "name") <- "volatiles:hdfsc"
-  parent.env(.imports) <- volatiles
+  .Call(set_eval_env, environment(.HDFS.open))
 
   if (!isTRUE(getOption("hdfsc.defer.init"))) .init()
 }
@@ -34,8 +32,12 @@ HDFS <- function(path, mode="r", fs, buffer = 8388608L) {
 }
 
 .HDFS.open <- function(hpath, mode) {
-  if (mode == "r" || mode == "rb")
-    .jcall(attr(hpath, "fs"), "Lorg/apache/hadoop/fs/FSDataInputStream;", "open", hpath, attr(path, "buffer.size"))
+  if (mode == "r" || mode == "rb") {
+    hif <- .jcall(attr(hpath, "fs"), "Lorg/apache/hadoop/fs/FSDataInputStream;", "open", hpath, attr(hpath, "buffer.size"))
+    attr(hif, "buffer") <- attr(hpath, "buffer")
+    attr(hif, "buffer.size") <- attr(hpath, "buffer.size")
+    hif
+  }
   else stop("Sorry, unsupported mode at this point")
 }
 
@@ -50,3 +52,6 @@ HDFS <- function(path, mode="r", fs, buffer = 8388608L) {
 
 .HDFS.seek <- function(hif, pos)
   .jcall(hif, "V", "seek", hif, .jlong(pos))
+
+.HDFS.close <- function(hif)
+  .jcall(hif, "V", "close")

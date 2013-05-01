@@ -1,2 +1,3 @@
-useDynLib(hdfsc, mk_hdfs_conn)
+useDynLib(hdfsc, mk_hdfs_conn, set_eval_env)
+import(rJava)
 export(HDFS)

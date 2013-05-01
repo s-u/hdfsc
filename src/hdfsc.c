@@ -7,6 +7,8 @@
 #error "Unsupported connections API version"
 #endif
 
+static SEXP hdfs_eval_env;
+
 typedef struct hdfsc {
     SEXP jpath;
     SEXP hif;
@@ -21,9 +23,15 @@ static void hdfsc_close(Rconnection c) {
 	    R_ReleaseObject(hc->buf);
 	    hc->bsize = hc->bpos = 0;
 	}
-	eval(PROTECT(lang2(install(".HDFS.close"), hc->hif)), R_GlobalEnv);
-	UNPROTECT(1);
-	c->isopen = 0;
+	if (c->isopen && hc->hif != R_NilValue) {
+	    eval(PROTECT(lang2(install(".HDFS.close"), hc->hif)), hdfs_eval_env);
+	    UNPROTECT(1);
+	}
+	if (hc->hif != R_NilValue) {
+	    R_ReleaseObject(hc->hif);
+	    hc->hif = R_NilValue;
+	}
+	c->isopen = FALSE;
     }
 }
 
@@ -33,8 +41,8 @@ static Rboolean hdfsc_open(Rconnection c) {
 	if (c->isopen)
             Rf_error("connection is already open");
 	if (c->mode[0] == 'r' && c->mode[1] != '+') {
-	    hc->hif = eval(PROTECT(lang3(install(".HDFS.open"), hc->jpath, mkString(c->mode))), R_GlobalEnv);
-	    setAttrib(hc->jpath, install("hif"), hc->hif);
+	    hc->hif = eval(PROTECT(lang3(install(".HDFS.open"), hc->jpath, mkString(c->mode))), hdfs_eval_env);
+	    R_PreserveObject(hc->hif);
 	    UNPROTECT(1);
 	    c->text = (c->mode[1] == 'b') ? FALSE : TRUE;
 	    c->canwrite = FALSE;
@@ -50,30 +58,29 @@ static size_t hdfsc_read(void *buf, size_t sz, size_t ni, Rconnection c) {
     hdfsc_t *hc = (hdfsc_t*) c->private;
     size_t len, req = sz * ni;
     if (!hc) Rf_error("invalid HDFS connection");
+    if (!req) return 0;
     /* all in the buffer */
-    if (hc->bsize - hc->bpos <= req) {
+    if (hc->bsize - hc->bpos >= req) {
 	memcpy(buf, RAW(hc->buf) + hc->bpos, req);
 	hc->bpos += req;
 	return ni;
     }
     /* has buffer ? */
-    if (hc->bsize) {
-	if (hc->bpos < hc->bsize) { /* some content ... */
-	    len = (hc->bsize - hc->bpos) / sz;
-	    if (len) {
-		len *= sz;
-		memcpy(buf, RAW(hc->buf) + hc->bpos, len);
-		hc->bpos += len;
-		buf = (void*)(((char*) buf) + len);
-		req -= len;
-		if (hc->bpos > hc->bsize) /* fraction of ni left */
-		    Rf_error("Reader has requested items of size %d but an item crosses block boundary, aborting", sz);
-		/* FIXME: we cannot keep anything left over in the buffer, because there will be a new buffer for next read */
-	    }
+    if (hc->bsize && hc->bpos < hc->bsize) { /* some content ... */
+	len = (hc->bsize - hc->bpos) / sz;
+	if (len) {
+	    len *= sz;
+	    memcpy(buf, RAW(hc->buf) + hc->bpos, len);
+	    hc->bpos += len;
+	    buf = (void*)(((char*) buf) + len);
+	    req -= len;
+	    if (hc->bpos > hc->bsize) /* fraction of ni left */
+		Rf_error("Reader has requested items of size %d but an item crosses block boundary, aborting", sz);
+	    /* FIXME: we cannot keep anything left over in the buffer, because there will be a new buffer for next read */
 	}
     } /* WARNING: the above adjusts req but *not* ni so do NOT use ni below this line */
     if (hc->buf != R_NilValue) R_ReleaseObject(hc->buf);
-    hc->buf = eval(PROTECT(lang2(install(".HDFS.read"), hc->hif)), R_GlobalEnv);
+    hc->buf = eval(PROTECT(lang2(install(".HDFS.read"), hc->hif)), hdfs_eval_env);
     hc->bsize = LENGTH(hc->buf);
     hc->bpos = 0;
     if (req > hc->bsize)
@@ -118,6 +125,7 @@ SEXP mk_hdfs_conn(SEXP sPath, SEXP sMode, SEXP hPath) {
     rc = R_new_custom_connection(CHAR(STRING_ELT(sPath, 0)),
                                  CHAR(STRING_ELT(sMode, 0)),
                                  "HDFS", &con);
+    if (!hdfs_eval_env) hdfs_eval_env = R_GlobalEnv; /* this should never happen but .. */
     PROTECT(rc);
     cc = malloc(sizeof(hdfsc_t));
     if (!cc) Rf_error("cannot allocate HDFS private context");
@@ -138,4 +146,9 @@ SEXP mk_hdfs_conn(SEXP sPath, SEXP sMode, SEXP hPath) {
         Rf_error("cannot open the connection");
     UNPROTECT(1);
     return rc;
+}
+
+SEXP set_eval_env(SEXP rho) {
+    hdfs_eval_env = rho;
+    return rho;
 }
