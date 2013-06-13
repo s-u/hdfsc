@@ -44,6 +44,8 @@ HDFS <- function(path, mode="r", fs, buffer = 8388608L) {
 .HDFS.read <- function(hif) {
   b <- attr(hif, "buffer")
   n <- .jcall(hif, "I", "read", .jcast(b, "[B"))
+  ## this is undocumented in HDFS but read will return -1 on EOF
+  if (n < 0) return(raw())
   if (n == attr(hif, "buffer.size")) return(.jevalArray(b))
   b2 <- .jcall("java/lang/reflect/Array", "Ljava/lang/Object;", "newInstance", volatiles$BYTE.TYPE, n)
   .jcall("java/lang/System", "V", "arraycopy", b, 0L, b2, 0L, n)
