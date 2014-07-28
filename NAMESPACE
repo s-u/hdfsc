@@ -1,3 +1,3 @@
 useDynLib(hdfsc, mk_hdfs_conn, set_eval_env)
 import(rJava)
-export(HDFS)
+export(HDFS, hdfs.unlink, hdfs.exists, hdfs.glob, hdfs.info)
