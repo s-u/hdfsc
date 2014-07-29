@@ -1,0 +1,8 @@
+0.1-1	(under development)
+  o	added HDFS file-like operations such as hdfs.glob(), hdfs.info(),
+	hdfs.exists(), hdfs.home(), hdfs.rename(), hdfs.unlink() and
+	hdfs.mkdir()
+
+0.1-0	2013/05/01
+  o	initial release supporting HDFS read connections
+

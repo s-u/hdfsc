@@ -1,3 +1,4 @@
 useDynLib(hdfsc, mk_hdfs_conn, set_eval_env)
 import(rJava)
-export(HDFS, hdfs.unlink, hdfs.exists, hdfs.glob, hdfs.info)
+export(HDFS)
+exportPattern("hdfs\\..*")
