@@ -2,10 +2,25 @@ volatiles <- new.env(parent=emptyenv())
 attr(volatiles, "name") <- "volatiles:hdfsc"
 
 .init <- function() {
-  hadoop <- getOption("hadoop.cmd")
-  if (is.null(hadoop)) hadoop <- "hadoop"
-  cp <- system(paste(shQuote(hadoop), "classpath"), intern=TRUE)
-  .jaddClassPath(unlist(strsplit(cp, .Platform$path.sep, fixed=TRUE)))
+  hh <- Sys.getenv("HADOOP_HOME")
+  if (!nzchar(hh)) hh <- Sys.getenv("HADOOP_PREFIX")
+  hcmd <- file.path(hh, "bin", "hadoop")
+  if (!nzchar(hh) || !file.exists(hcmd)) {
+     hcmd <- Sys.which("hadoop")[1L]
+     if (!nzchar(hcmd))
+       stop("Cannot find working Hadoop home. Set HADOOP_PREFIX if in doubt.")
+  }
+  cp <- system(paste(shQuote(hcmd), "classpath"), intern=TRUE)
+  if (!nzchar(cp)) cp <- Sys.getenv("HADOOP_CLASSPATH")
+  if (!nzchar(cp)) stop("cannot determine Hadoop class path! Make sure hadoop works or set HADOOP_PREFIX and/or HADOOP_CLASSPATH")
+  cp <- unlist(strsplit(cp, .Platform$path.sep, fixed=TRUE))
+
+  ## the Java spec is brain-dead, it uses * to match exactly either of *.jar or *.JAR,
+  ## so it's really painful to implement that (what should have been a simple glob..)
+  if (any(grepl("\\*$", cp)))
+    cp <- unlist(lapply(cp, function(o) if (grepl("\\*$", o)) Sys.glob(paste0(gsub("\\*$","",o),c('*.jar','*.JAR'))) else o))
+  cp <- cp[nzchar(cp)] ## remove empty entries
+  .jaddClassPath(cp)
   volatiles$cfg <- .jnew("org/apache/hadoop/conf/Configuration")
   .jcall(volatiles$cfg, "V", "setClassLoader", .jcast(.jclassLoader(), "java/lang/ClassLoader"))
   volatiles$fs <- .jcall("org/apache/hadoop/fs/FileSystem", "Lorg/apache/hadoop/fs/FileSystem;", "get", volatiles$cfg)

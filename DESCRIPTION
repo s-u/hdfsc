@@ -1,5 +1,5 @@
 Package: hdfsc
-Version: 0.1-1
+Version: 0.1-2
 Title: HDFS-based connections for R and HDFS-related file operations (Hadoop Distributed File System)
 Author: Simon Urbanek <Simon.Urbanek@r-project.org>
 Maintainer: Simon Urbanek <Simon.Urbanek@r-project.org>
