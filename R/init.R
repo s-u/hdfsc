@@ -7,7 +7,8 @@ attr(volatiles, "name") <- "volatiles:hdfsc"
   hcmd <- file.path(hh, "bin", "hadoop")
   if (!nzchar(hh) || !file.exists(hcmd)) {
      hcmd <- Sys.which("hadoop")[1L]
-     if (!nzchar(hcmd))
+     if (!nzchar(hcmd)) hcmd <- file.path("usr", "lib", "hadoop", "bin", "hadoop")
+     if (!file.exists(hcmd))
        stop("Cannot find working Hadoop home. Set HADOOP_PREFIX if in doubt.")
   }
   cp <- system(paste(shQuote(hcmd), "classpath"), intern=TRUE)
